@@ -1,9 +1,11 @@
 from flask import Blueprint, request, jsonify, render_template
-from . import db
-from .models import Message
 from .spam_filter import is_spam
 
 main = Blueprint('main', __name__)
+
+# In-memory storage for messages
+messages = []
+next_id = 1
 
 @main.route('/')
 def index():
@@ -11,16 +13,22 @@ def index():
 
 @main.route('/messages', methods=['GET', 'POST'])
 def handle_messages():
+    global next_id
+
     if request.method == 'POST':
-        content = request.json['content']
+        content = request.json.get('content', '')
         spam = is_spam(content)
-        message = Message(content=content, spam=spam)
-        db.session.add(message)
-        db.session.commit()
-        return jsonify({"id": message.id, "content": content, "spam": spam})
+        message = {
+            "id": next_id,
+            "content": content,
+            "spam": spam
+        }
+        messages.append(message)
+        next_id += 1
+        return jsonify(message)
+
     elif request.method == 'GET':
-        messages = Message.query.all()
-        return jsonify([{"id": m.id, "content": m.content, "spam": m.spam} for m in messages])
+        return jsonify(messages)
 
 if __name__ == '__main__':
     from . import create_app
